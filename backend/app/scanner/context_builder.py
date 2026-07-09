@@ -41,3 +41,19 @@ class ContextBuilder:
                 context["files"].append(data)
 
         return context
+
+    def build_dependency(self, analysis: dict):
+
+        context = {"project_type": analysis["project_type"], "files": []}
+
+        targets = []
+
+        targets += analysis.get("dependency_files", [])
+        for file in targets:
+
+            data = self.read_file(file)
+
+            if data:
+                context["files"].append(data)
+
+        return context
