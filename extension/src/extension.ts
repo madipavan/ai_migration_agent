@@ -1,42 +1,35 @@
 import * as vscode from "vscode";
-import { analyzeProject } from "./services/api_client";
+import { MigrationPanel } from "./panels/MigrationPanel";
 
 
 export function activate(
     context: vscode.ExtensionContext
 ) {
 
+    console.log(
+        "Migration Agent Activated"
+    );
+
+
     const disposable =
         vscode.commands.registerCommand(
             "codeshift-ai.analyze",
-            async () => {
+            () => {
 
-                const workspace =
-                    vscode.workspace.workspaceFolders?.[0];
-
-                if (!workspace) {
-                    vscode.window.showErrorMessage(
-                        "No workspace opened"
-                    );
-                    return;
-                }
-
-
-                const result =
-                    await analyzeProject(
-                        workspace.uri.fsPath
-                    );
-
-
-                vscode.window.showInformationMessage(
-                    result.status
+                MigrationPanel.createOrShow(
+                    context.extensionUri
                 );
+
             }
         );
 
 
-    context.subscriptions.push(disposable);
+    context.subscriptions.push(
+        disposable
+    );
+
 }
+
 
 
 export function deactivate() {}
