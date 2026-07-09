@@ -16,18 +16,52 @@ export class MigrationPanel {
     public static currentPanel: MigrationPanel | undefined;
     private readonly panel: vscode.WebviewPanel;
     private connectionStatus: "connected" | "disconnected" = "disconnected";
-
+    private socket: WebSocket;
     private constructor(
         panel: vscode.WebviewPanel,
-        extensionUri: vscode.Uri
+        extensionUri: vscode.Uri,
+        socket: WebSocket
     ) {
         this.panel = panel;
+        this.socket = socket;
         this.panel.webview.html = this.getHtml();
         this.setupMessageHandlers();
         this.checkBackendConnection();
-    }
+        this.openWebSocket()
 
-    public static createOrShow(extensionUri: vscode.Uri) {
+        setTimeout(() => {
+            this.sendWelcomeMessage();
+        }, 500);
+    }
+    private sendWelcomeMessage() {
+        this.panel.webview.postMessage({
+            command: "addAssistantMessage",
+            data: {
+                message:
+                    `👋 Hi, I'm CodeShift AI.
+
+I can help you migrate, upgrade, or analyze your project.
+
+Tell me what you want to do.`
+            }
+        });
+    }
+    private openWebSocket() {
+        this.socket.onmessage = (e) => {
+            const data = JSON.parse(e.data);
+            this.panel.webview.postMessage({
+                command: "addAssistantMessage",
+                data: {
+                    message: data.message
+                }
+            })
+        }
+
+        this.socket.onopen = () => {
+            console.log("WS connected");
+        };
+    }
+    public static createOrShow(extensionUri: vscode.Uri, socket: WebSocket) {
         if (MigrationPanel.currentPanel) {
             MigrationPanel.currentPanel.panel.reveal();
             return;
@@ -43,7 +77,7 @@ export class MigrationPanel {
             }
         );
 
-        MigrationPanel.currentPanel = new MigrationPanel(panel, extensionUri);
+        MigrationPanel.currentPanel = new MigrationPanel(panel, extensionUri, socket);
     }
 
     private setupMessageHandlers() {
@@ -138,17 +172,9 @@ export class MigrationPanel {
     }
 
     private async sendToBackend(text: string) {
-        const res = await fetch("http://localhost:8000/chat", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ message: text }),
-        });
-
-        if (!res.ok) {
-            throw new Error(`Backend error: ${res.statusText}`);
-        }
-
-        return await res.json();
+        this.socket.send(
+            JSON.stringify({ message: text })
+        )
     }
 
     private getHtml(): string {
@@ -179,8 +205,8 @@ export class MigrationPanel {
         .container {
             display: flex;
             flex-direction: column;
-            height: 100vh;
-            width: 100vw;
+            height: 100%;
+            width: 100%;
             background: linear-gradient(135deg, #0d1117 0%, #161b22 50%, #0d1117 100%);
         }
 

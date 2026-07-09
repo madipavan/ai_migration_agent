@@ -1,35 +1,35 @@
-from scanner.repo_scanner import RepoScanner
-from agents.file_classifier_agent import FileClassifierAgent
-from dotenv import load_dotenv
-import os
+from fastapi import FastAPI, WebSocket
+from fastapi.middleware.cors import CORSMiddleware
 
-load_dotenv()
+app = FastAPI()
 
-from langchain_mistralai import ChatMistralAI
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-PROJECT_PATH = r"D:\zovryn_assignment\frontend_mob"
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
 
 
-def main():
+@app.websocket("/chat")
+async def chat(websocket: WebSocket):
+    await websocket.accept()
 
-    print("Scanning repo...")
-
-    scanner = RepoScanner(PROJECT_PATH)
-
-    files = scanner.scan()
-
-    print(f"Found {len(files)} files")
-
-    # send only metadata to LLM
-    classifier = FileClassifierAgent(
-        llm=ChatMistralAI(model="mistral-large-latest", api_key=os.getenv("MISTRAL"))
+    await websocket.send_json(
+        {"type": "assistant", "message": "👋 Hi, I'm CodeShift AI"}
     )
 
-    result = classifier.classify(files)
+    while True:
+        data = await websocket.receive_json()
+        print(data)
+        user_message = data["message"]
 
-    print("\nMigration Context:")
-    print(result.content)
-
-
-if __name__ == "__main__":
-    main()
+        await websocket.send_json(
+            {"type": "assistant", "message": f"You said: {user_message}"}
+        )

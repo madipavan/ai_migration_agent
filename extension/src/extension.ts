@@ -1,15 +1,16 @@
 import * as vscode from "vscode";
 import { MigrationPanel } from "./panels/MigrationPanel";
+import { connectToWebSocket } from "./services/socket_connection";
 
 
-export function activate(
+export async function activate(
     context: vscode.ExtensionContext
 ) {
 
     console.log(
         "Migration Agent Activated"
     );
-
+    const socket = await connectToWebSocket()
 
     const disposable =
         vscode.commands.registerCommand(
@@ -17,7 +18,8 @@ export function activate(
             () => {
 
                 MigrationPanel.createOrShow(
-                    context.extensionUri
+                    context.extensionUri,
+                    socket
                 );
 
             }
