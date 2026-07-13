@@ -3,8 +3,8 @@ from pathlib import Path
 
 class ContextBuilder:
 
-    def __init__(self, project_path: str):
-        self.root = Path(project_path)
+    def __init__(self, analysis: dict):
+        self.analysis = analysis
 
     def read_file(self, relative_path):
 
@@ -19,19 +19,19 @@ class ContextBuilder:
         except Exception as e:
             return {"path": relative_path, "error": str(e)}
 
-    def build(self, analysis: dict):
+    def build(self):
 
-        context = {"project_type": analysis["project_type"], "files": []}
+        context = {"project_type": self.analysis["project_type"], "files": []}
 
         targets = []
 
-        targets += analysis.get("entry_points", [])
+        targets += self.analysis.get("entry_points", [])
 
-        targets += analysis.get("dependency_files", [])
+        targets += self.analysis.get("dependency_files", [])
 
-        targets += analysis.get("config_files", [])
+        targets += self.analysis.get("config_files", [])
 
-        targets += analysis.get("migration_critical_files", [])
+        targets += self.analysis.get("migration_critical_files", [])
 
         for file in targets:
 
@@ -42,13 +42,13 @@ class ContextBuilder:
 
         return context
 
-    def build_dependency(self, analysis: dict):
+    def build_dependency(self):
 
-        context = {"project_type": analysis["project_type"], "files": []}
+        context = {"project_type": self.analysis["project_type"], "files": []}
 
         targets = []
 
-        targets += analysis.get("dependency_files", [])
+        targets += self.analysis.get("dependency_files", [])
         for file in targets:
 
             data = self.read_file(file)
