@@ -9,9 +9,30 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onCommand:codeshift-ai.analyze",
+    "onView:codeshift-ai.chatView"
+  ],
   "main": "./dist/extension.js",
   "contributes": {
+    "viewsContainers": {
+      "secondarySidebar": [
+        {
+          "id": "codeshift-ai",
+          "title": "CodeShift AI",
+          "icon": "resources/codeshift.svg"
+        }
+      ]
+    },
+    "views": {
+      "codeshift-ai": [
+        {
+          "type": "webview",
+          "id": "codeshift-ai.chatView",
+          "name": "CodeShift AI"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "codeshift-ai.analyze",
