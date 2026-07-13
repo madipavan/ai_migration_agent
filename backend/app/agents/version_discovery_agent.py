@@ -38,6 +38,7 @@ Return ONLY JSON:
 {{
   "framework": {{
       "name":"",
+      "package": "",
       "version":""
   }},
 
