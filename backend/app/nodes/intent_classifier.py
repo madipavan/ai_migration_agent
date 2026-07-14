@@ -22,7 +22,7 @@ llm = get_llm()
 str_output = llm.with_structured_output(schema=IntentClassifier)
 
 
-async def intent_classifier(state: AgentState) -> str:
+async def intent_classifier(state: AgentState) -> dict:
     messages = state["messages"]
     result = await str_output.ainvoke(messages)
 

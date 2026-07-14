@@ -38,6 +38,9 @@ import asyncio
 
 from langchain_core.messages import HumanMessage
 from app.graph.workflow import graph
+from langgraph.types import Command
+
+config = {"configurable": {"thread_id": "console"}}
 
 
 async def main():
@@ -53,7 +56,26 @@ async def main():
 
         state["messages"].append(HumanMessage(content=user_input))
 
-        async for event in graph.astream(state):
+        async for event in graph.astream(state, config=config):
+            if "__interrupt__" in event:
+
+                interrupt = event["__interrupt__"][0]
+
+                print(interrupt.value)
+
+                answer = input("You: ")
+
+                # 2. Stream the Command and consume the generator using 'async for'
+                async for resume_event in graph.astream(
+                    Command(resume=answer), config=config
+                ):
+                    for value in resume_event.values():
+                        if not isinstance(value, dict):
+                            state.update(value)
+                        if "messages" in value:
+                            last_message = value["messages"][-1]
+                            if last_message.type == "ai":
+                                print(f"\nAI: {last_message.content}")
 
             for value in event.values():
                 state.update(value)

@@ -1,9 +1,12 @@
+from app.models.version_discovery_model import VersionDiscoveryModel
+
+
 class VersionDiscoveryAgent:
 
     def __init__(self, llm):
-        self.llm = llm
+        self.llm = llm.with_structured_output(VersionDiscoveryModel)
 
-    def discover(self, repo_context):
+    async def discover(self, repo_context):
 
         prompt = f"""
 You are a software version discovery engine.
@@ -14,7 +17,6 @@ Repository context:
 
 {repo_context}
 
-
 Extract:
 
 1. Primary framework and version
@@ -24,53 +26,14 @@ Extract:
 5. Package manager
 6. Dependencies and their current versions
 
-
 Rules:
-- Do NOT suggest upgrades
-- Do NOT create migration plans
-- Do NOT guess missing versions
-- If unknown, return null
-- Use only provided files
-
-
-Return ONLY JSON:
-
-{{
-  "framework": {{
-      "name":"",
-      "package": "",
-      "version":""
-  }},
-
-  "language": {{
-      "name":"",
-      "version":""
-  }},
-
-  "runtime": {{
-      "name":"",
-      "version":""
-  }},
-
-  "package_manager": {{
-      "name":"",
-      "version":""
-  }},
-
-  "build_tools":[
-      {{
-        "name":"",
-        "version":""
-      }}
-  ],
-
-  "dependencies":[
-      {{
-        "name":"",
-        "version":""
-      }}
-  ]
-}}
+- Do NOT suggest upgrades.
+- Do NOT create migration plans.
+- Do NOT guess missing versions.
+- If unknown, use null.
+- Use only the provided files.
 """
 
-        return self.llm.invoke(prompt)
+        result = await self.llm.ainvoke(prompt)
+
+        return result

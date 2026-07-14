@@ -14,3 +14,7 @@ class AgentState(TypedDict):
     package_manager: dict
     build_tools: dict
     repo_dependencies: dict
+    latest_versions: dict
+    pending_action: str | None
+    compatibility_assessment: dict
+    requested_action: str | None

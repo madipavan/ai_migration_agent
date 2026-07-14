@@ -3,12 +3,13 @@ from pathlib import Path
 
 class ContextBuilder:
 
-    def __init__(self, analysis: dict):
+    def __init__(self, analysis: dict, repo_root: str):
         self.analysis = analysis
+        self.repo_root = Path(repo_root)
 
     def read_file(self, relative_path):
 
-        path = self.root / relative_path
+        path = self.repo_root / relative_path
 
         if not path.exists():
             return None

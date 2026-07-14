@@ -31,7 +31,7 @@ class LatestVersionService:
 
         self.discovery_agent = OfficialSourceDiscoveryAgent(llm=llm)
 
-    async def discover(
+    async def get_latest_version(
         self,
         framework: dict,
         package_manager: dict,

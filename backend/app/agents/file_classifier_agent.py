@@ -1,7 +1,10 @@
+from app.models.file_classification_model import FileClassificationModel
+
+
 class FileClassifierAgent:
 
     def __init__(self, llm):
-        self.llm = llm
+        self.llm = llm.with_structured_output(FileClassificationModel)
 
     def classify(self, files):
 
@@ -14,7 +17,6 @@ You ONLY have the file tree and metadata.
 
 Files:
 {files}
-
 
 Your task:
 
@@ -29,19 +31,9 @@ Rules:
 - Exclude caches
 - Exclude build outputs
 - Exclude IDE files
-- Exclude files that can be recreated automatically
-
-Return ONLY valid JSON:
-
-{{
-  "project_type": "",
-  "entry_points": [],
-  "dependency_files": [],
-  "config_files": [],
-  "migration_critical_files": [],
-  "source_directories": [],
-  "ignored_files": []
-}}
+- Exclude files that can be recreated automatically.
 """
 
-        return self.llm.invoke(prompt)
+        result = self.llm.invoke(prompt)
+
+        return result
