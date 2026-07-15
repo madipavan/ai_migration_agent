@@ -14,7 +14,7 @@ Framework:
 - {state["framework"]["name"]} {state["framework"]["version"]}
 
 Latest Stable:
-- {state.latest_versions["latest_version"]}
+- {state["latest_versions"]}
 
 Assessment:
 - Migration Required: {"Yes" if assessment["migration_required"] else "No"}

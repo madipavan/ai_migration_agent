@@ -14,13 +14,13 @@ async def compatibility_assessment_node(state: AgentState):
     assessment_agent = CompatibilityAssessmentAgent(llm)
 
     assessment = await assessment_agent.assess(
-        framework=state.framework,
-        language=state.language,
-        runtime=state.runtime,
-        package_manager=state.package_manager,
-        build_tools=state.build_tools,
-        latest_versions=state.latest_versions,
-        dependencies=state.repo_dependencies,
+        framework=state["framework"],
+        language=state["language"],
+        runtime=state["runtime"],
+        package_manager=state["package_manager"],
+        build_tools=state["build_tools"],
+        latest_versions=state["latest_versions"],
+        dependencies=state["repo_dependencies"],
     )
 
     return {"compatibility_assessment": assessment}
