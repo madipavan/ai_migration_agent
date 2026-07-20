@@ -1,6 +1,8 @@
 from langchain_core.messages import AIMessage
 
 from app.state import AgentState
+from langgraph.types import interrupt
+from langgraph.graph import END
 
 
 async def assessment_summary_node(state: AgentState):
@@ -27,14 +29,23 @@ Assessment:
 Summary:
 {assessment["summary"]}
 
-Would you like me to continue with the migration?
-
-Reply with:
-- yes
-- no
 """
-
     return {
         "messages": [AIMessage(content=summary)],
         "pending_action": "select_target_version",
     }
+
+
+# NODE 2: Dedicated human approval gate
+async def assessment_summary_HG_node(state: AgentState):
+    # This node does nothing except pause and wait for the resume payload
+    answer = interrupt(
+        "Would you like me to continue with the migration? Reply with: yes / no"
+    )
+
+    if answer.lower() == "yes":
+        next_node = "migrate_dependecy"
+    else:
+        next_node = END
+
+    return {"next_node": next_node}
