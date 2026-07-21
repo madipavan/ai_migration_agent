@@ -1,0 +1,1 @@
+Legacy React 16 project intentionally using outdated dependencies for migration testing.
