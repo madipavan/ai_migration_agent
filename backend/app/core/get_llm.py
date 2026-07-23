@@ -8,7 +8,7 @@ load_dotenv()
 def get_llm():
     llm = init_chat_model(
         api_key=os.getenv("MISTRAL"),
-        model="mistral-small-latest",
+        model="mistral-medium",
         model_provider="mistralai",
     )
     return llm

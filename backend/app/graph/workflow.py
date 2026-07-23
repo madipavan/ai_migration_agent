@@ -6,6 +6,7 @@ from app.state import AgentState
 from app.nodes.intent_classifier import intent_classifier
 from app.graph.subgraphs.chat_graph import chat_graph
 from app.graph.subgraphs.dependency_analysis_graph import dependency_analysis_graph
+from app.graph.subgraphs.migration_graph import migration_graph
 from langgraph.checkpoint.memory import InMemorySaver
 
 workflow = StateGraph(AgentState)
@@ -14,6 +15,7 @@ workflow = StateGraph(AgentState)
 workflow.add_node("intent_classifier", intent_classifier)
 workflow.add_node("chat_graph", chat_graph)
 workflow.add_node("dependency_analysis_graph", dependency_analysis_graph)
+workflow.add_node("migration_graph", migration_graph)
 
 
 workflow.add_edge(START, "intent_classifier")
@@ -22,7 +24,7 @@ workflow.add_conditional_edges(
     "intent_classifier",
     lambda state: state["next_node"],
     {
-        # "migration": "migration_node",
+        "migration": "migration_graph",
         "analyze_dependencies": "dependency_analysis_graph",
         # "refactor_syntax": "refactor_node",
         "chat": "chat_graph",

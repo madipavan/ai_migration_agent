@@ -9,6 +9,9 @@ from typing import Any
 
 from crewai import Agent, Crew, LLM, Process, Task
 
+from app.crew_tools.latest_version_tool import LatestVersionTool
+from app.services.latest_version.latest_version_service import LatestVersionService
+
 
 def _get_crew_llm() -> LLM:
     api_key = os.getenv("MISTRAL") or os.getenv("MISTRAL_API_KEY")
@@ -20,7 +23,7 @@ def _get_crew_llm() -> LLM:
     # Use Mistral's OpenAI-compatible endpoint. The litellm `mistral/` route
     # currently breaks with CrewAI message metadata (cache_breakpoint).
     return LLM(
-        model="mistral-small-latest",
+        model="mistral-medium",
         api_key=api_key,
         base_url="https://api.mistral.ai/v1",
         temperature=0.2,
@@ -52,6 +55,7 @@ def _extract_json(text: str) -> dict[str, Any]:
 def run_dependency_migrate_crew(
     *,
     framework: dict,
+    package_manager: dict,
     language: dict,
     latest_versions: dict,
     dependencies: dict | list,
@@ -84,23 +88,41 @@ Dependency files to migrate:
 {file_blocks}
 """
 
+    latest_version_tool = LatestVersionTool(
+        service=LatestVersionService(llm=llm),
+        framework=framework,
+        package_manager=package_manager,
+    )
     planner = Agent(
         role="Dependency Migration Planner",
-        goal="Produce a safe, ordered dependency upgrade plan from the assessment.",
+        goal="""Produce a safe dependency migration plan and identify every dependency that is:
+          - Kept
+          - Upgraded
+          - Downgraded
+          - Replaced
+          - Deprecated
+          - Removed
+
+            For every dependency that is not kept, provide:
+            - old package
+            - new package (if any)
+            - reason
+            - expected import path changes (if known)""",
         backstory=(
             "You are a senior release engineer. You prioritize SDK/runtime constraints first, "
             "then framework packages, then app dependencies. You never invent packages."
         ),
         llm=llm,
-        verbose=False,
+        verbose=True,
         allow_delegation=False,
+        tools=[latest_version_tool],
     )
 
     migrator = Agent(
         role="Dependency File Migrator",
         goal="Rewrite dependency manifest files according to the approved plan.",
         backstory=(
-            "You specialize in pubspec.yaml, requirements.txt, and pyproject.toml. "
+            "You specialize in migrating any pacakage file for example pubspec.yaml, requirements.txt, and pyproject.toml. "
             "You preserve unrelated keys, comments where possible, and valid file syntax."
         ),
         llm=llm,
@@ -122,17 +144,45 @@ Dependency files to migrate:
 
     plan_task = Task(
         description=f"""
-Using this project context, write a concise migration plan for updating dependency files only
-(do not rewrite application source code).
+Using the project context, create a dependency migration plan only.
+Do NOT rewrite application source code.
 
 Context:
 {context_blob}
 
-Return a numbered plan covering:
-1) runtime/SDK constraint updates
-2) framework/language bumps
-3) package dependency bumps
-4) risks / breaking-change notes
+CRITICAL RULES
+
+- latest_versions contains ONLY the target framework, language and runtime versions.
+- It DOES NOT contain dependency package versions.
+- For every dependency that requires a version lookup, you MUST use the latest_version_tool.
+- Never use your own knowledge or memory for dependency versions.
+- Never guess dependency versions.
+- If the LatestVersionTool cannot determine a version:
+    - Keep the current version.
+    - Mention the package in the migration risks.
+- Use the compatibility assessment when deciding whether a dependency should be kept, upgraded, replaced, removed, or deprecated.
+- Prioritize runtime and framework compatibility before upgrading dependencies.
+- Only recommend officially supported replacement packages.
+
+For every dependency that is not KEEP include:
+
+- package name
+- current version
+- target version (if available)
+- replacement package (if applicable)
+- reason
+- migration risk
+- expected import changes (if known)
+
+Return a numbered migration plan covering:
+
+1. Runtime / SDK updates
+2. Framework updates
+3. Dependency changes
+4. Deprecated or replaced packages
+5. Potential breaking changes
+6. Migration risks
+7. Validation steps after migration
 """,
         expected_output="A clear numbered migration plan in plain text.",
         agent=planner,
@@ -140,39 +190,103 @@ Return a numbered plan covering:
 
     migrate_task = Task(
         description=f"""
-Apply the planner's plan and produce updated full file contents for each dependency file.
+Apply the planner's migration plan and generate the updated dependency manifest(s).
 
-Rules:
-- Output complete file contents, not patches.
-- Keep valid syntax for pubspec.yaml / requirements.txt / pyproject.toml.
-- Prefer latest_versions and assessment guidance; do not invent unknown packages.
-- Preserve project name, description, and unrelated config sections.
+CRITICAL RULES
+
+- Output COMPLETE file contents. Never output patches.
+- Preserve valid syntax for every dependency manifest.
+- Preserve formatting and unrelated configuration.
+- Never invent package names.
+- Never invent package versions.
+- Use ONLY versions available in latest_versions.
+- If a package is missing from latest_versions:
+    - Keep the existing version.
+    - Mention it in the migration notes.
+- Update SDK/runtime constraints before dependency upgrades.
+- Upgrade packages according to latest_versions and compatibility assessment.
+- Replace deprecated packages with their recommended replacements.
+- Remove deprecated packages from the final manifest.
+- Preserve project metadata (name, description, scripts, plugins, etc.).
+- Generate a dependency_changes report describing every dependency decision.
+- The generated dependency manifest must be ready to execute with the package manager without requiring manual edits.
 
 Original files:
+
 {file_blocks}
 """,
-        expected_output="Updated file contents for each path, clearly labeled.",
+        expected_output="""
+Updated dependency manifests together with a complete dependency_changes report.
+""",
         agent=migrator,
         context=[plan_task],
     )
-
     review_task = Task(
         description="""
-Review the plan and migrated files. Return ONLY valid JSON (no markdown outside JSON) with this schema:
+Review the migrated dependency manifests.
+
+Verify all of the following:
+
+- Dependency manifests are syntactically valid.
+- SDK/runtime constraints are compatible.
+- Every original dependency has exactly one migration decision.
+- No dependency has been silently removed.
+- dependency_changes completely describes every dependency.
+- Package versions match latest_versions.
+- No package version has been invented.
+- Replacement packages are compatible with the target framework.
+
+If build or package manager output is provided (for example:
+flutter pub get,
+dart pub get,
+npm install,
+pnpm install,
+yarn install,
+pip install,
+dotnet restore,
+cargo check,
+gradle build),
+
+analyze the errors and automatically fix the dependency manifests whenever possible.
+
+If a conflict can be resolved safely,
+return the corrected dependency files.
+
+If the error cannot be resolved automatically,
+set approved=false and clearly explain the blocking issue.
+
+Return ONLY valid JSON.
+
+Schema:
 
 {
   "approved": true,
-  "plan": "short plan summary",
-  "notes": "reviewer notes / risks",
+  "plan": "...",
+  "notes": "...",
   "files": [
-    {"path": "pubspec.yaml", "content": "full file content here"}
+    {
+      "path": "...",
+      "content": "..."
+    }
+  ],
+  "dependency_changes": [
+    {
+      "package": "...",
+      "action": "keep|upgrade|replace|remove|deprecated",
+      "replacement": null,
+      "reason": "...",
+      "imports": []
+    }
   ]
 }
 
-If something is unsafe, still return best-effort corrected files with approved=false and explain in notes.
 Paths must match the original relative paths.
+Never return Markdown.
+Never return explanations outside JSON.
 """,
-        expected_output="Strict JSON object with approved, plan, notes, and files array.",
+        expected_output="""
+Strict JSON containing approved, plan, notes, files and dependency_changes.
+""",
         agent=reviewer,
         context=[plan_task, migrate_task],
     )
@@ -214,5 +328,6 @@ Paths must match the original relative paths.
         "plan": str(parsed.get("plan") or ""),
         "notes": str(parsed.get("notes") or ""),
         "files": normalized_files,
+        "dependency_changes": parsed.get("dependency_changes", []),
         "raw": raw,
     }

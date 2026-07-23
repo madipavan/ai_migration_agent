@@ -44,8 +44,7 @@ class TechnologyVersionService:
         }
 
     async def get_latest(self, technology: dict):
-
-        name = technology.get("name", "").strip().lower()
+        name = (technology.get("name") or "").strip().lower()
 
         provider = self.providers.get(name)
 

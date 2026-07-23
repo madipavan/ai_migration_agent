@@ -7,53 +7,12 @@ from langchain_core.messages import AIMessage
 
 from app.crews.dependency_migrate_crew import run_dependency_migrate_crew
 from app.state import AgentState
-
-# Prefer Flutter/Dart manifests first (current demo path), then Python.
-_PRIORITY_NAMES = (
-    "pubspec.yaml",
-    "requirements.txt",
-    "pyproject.toml",
-)
+from app.utils.dependency_helpers import collect_dependency_files
 
 
-def _collect_dependency_files(state: AgentState) -> list[dict[str, str]]:
-    repo_root = Path(state["repo_root"])
-    analysis = state.get("repo_analysis") or {}
-    declared = list(analysis.get("dependency_files") or [])
-
-    # Fallback discovery if classifier missed them.
-    if not declared:
-        for name in _PRIORITY_NAMES:
-            candidate = repo_root / name
-            if candidate.exists():
-                declared.append(name)
-
-    # Keep stable priority order, then any remaining declared paths.
-    ordered: list[str] = []
-    lowered = {p.replace("\\", "/"): p for p in declared}
-    for name in _PRIORITY_NAMES:
-        for rel, original in list(lowered.items()):
-            if rel.endswith(name) or Path(rel).name == name:
-                ordered.append(original)
-                lowered.pop(rel, None)
-                break
-    ordered.extend(lowered.values())
-
-    files: list[dict[str, str]] = []
-    for rel in ordered:
-        path = repo_root / rel
-        if not path.exists() or not path.is_file():
-            continue
-        try:
-            content = path.read_text(encoding="utf-8")
-        except OSError:
-            continue
-        files.append({"path": rel.replace("\\", "/"), "content": content})
-
-    return files
-
-
-def _write_files(repo_root: str, files: list[dict[str, str]], *, dry_run: bool) -> list[str]:
+def _write_files(
+    repo_root: str, files: list[dict[str, str]], *, dry_run: bool
+) -> list[str]:
     written: list[str] = []
     root = Path(repo_root)
     for item in files:
@@ -79,7 +38,11 @@ def _build_diff_summary(
 ) -> str:
     original_map = {f["path"]: f["content"] for f in originals}
     sections: list[str] = [
-        "Dependency migration completed." if approved else "Dependency migration finished with reviewer warnings.",
+        (
+            "Dependency migration completed."
+            if approved
+            else "Dependency migration finished with reviewer warnings."
+        ),
         "",
         f"Approved: {approved}",
         "",
@@ -121,7 +84,7 @@ def migrate_dependecy_file_node(state: AgentState):
             ]
         }
 
-    originals = _collect_dependency_files(state)
+    originals = collect_dependency_files(state)
     if not originals:
         return {
             "messages": [
@@ -144,6 +107,7 @@ def migrate_dependecy_file_node(state: AgentState):
             dependencies=state.get("repo_dependencies") or {},
             assessment=state.get("compatibility_assessment") or {},
             files=originals,
+            package_manager=state.get("package_manager") or {},
         )
     except Exception as exc:
         print(f"CrewAI migrate failed: {exc}")

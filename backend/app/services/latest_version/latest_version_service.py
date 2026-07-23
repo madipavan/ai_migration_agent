@@ -28,19 +28,23 @@ class LatestVersionService:
         }
 
         self.dynamic_provider = DynamicProvider()
-
         self.discovery_agent = OfficialSourceDiscoveryAgent(llm=llm)
 
     async def get_latest_version(
         self,
         framework: dict,
         package_manager: dict,
+        package_name: str,
+        current_version: str,
     ):
 
         manager = package_manager.get("name", "").strip().lower()
 
-        package_name = framework.get("package")
-        current_version = framework.get("version")
+        print("=" * 80)
+        print("Latest Version Lookup Started")
+        print("Package Manager : %s", manager)
+        print("Package         : %s", package_name)
+        print("Current Version : %s", current_version)
 
         provider = self.providers.get(manager)
 
@@ -48,22 +52,68 @@ class LatestVersionService:
         # Known package manager
         #
         if provider:
-
-            return await provider.get_latest(
-                package_name=package_name,
-                current_version=current_version,
+            print(
+                "Using official provider: %s",
+                provider.__class__.__name__,
             )
+
+            try:
+                result = await provider.get_latest(
+                    package_name=package_name,
+                    current_version=current_version,
+                )
+
+                print(
+                    "Latest version found: %s",
+                    result.get("latest_version"),
+                )
+
+                print(
+                    "Official source: %s",
+                    result.get("source"),
+                )
+
+                print("Lookup completed successfully.")
+                print("=" * 80)
+
+                return result
+
+            except Exception:
+                print(
+                    "Official provider lookup failed for '%s'",
+                    package_name,
+                )
+                raise
 
         #
         # Unknown ecosystem
         #
+        print(
+            "No provider registered for package manager '%s'.",
+            manager,
+        )
+        print("Attempting official source discovery...")
+
         source = await self.discovery_agent.discover(
             framework=framework,
             package_manager=package_manager,
         )
 
-        return await self.dynamic_provider.get_latest(
+        print("Discovered source: %s", source)
+
+        print("Attempting dynamic version lookup...")
+
+        result = await self.dynamic_provider.get_latest(
             package_name=package_name,
             current_version=current_version,
             source=source,
         )
+
+        print(
+            "Dynamic lookup result: %s",
+            result.get("latest_version"),
+        )
+
+        print("=" * 80)
+
+        return result
